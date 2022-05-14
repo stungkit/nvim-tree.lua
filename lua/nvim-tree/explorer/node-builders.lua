@@ -64,8 +64,20 @@ end
 function M.link(parent, absolute_path, name, status, parent_ignored)
   --- I dont know if this is needed, because in my understanding, there isnt hard links in windows, but just to be sure i changed it.
   local link_to = uv.fs_realpath(absolute_path)
+  local is_directory = (link_to ~= nil) and uv.fs_stat(link_to).type == "directory"
+
+  -- show the git status of the link itself, otherwise the file/folder linked to
+  local git_status = M.get_git_status(parent_ignored, status, absolute_path)
+  if not git_status then
+    if is_directory then
+      git_status = M.get_dir_git_status(parent_ignored, status, link_to)
+    else
+      git_status = M.get_git_status(parent_ignored, status, link_to)
+    end
+  end
+
   local open, nodes, has_children
-  if (link_to ~= nil) and uv.fs_stat(link_to).type == "directory" then
+  if is_directory then
     local handle = uv.fs_scandir(link_to)
     has_children = handle and uv.fs_scandir_next(handle) ~= nil
     open = false
@@ -75,7 +87,7 @@ function M.link(parent, absolute_path, name, status, parent_ignored)
   return {
     absolute_path = absolute_path,
     fs_stat = uv.fs_stat(absolute_path),
-    git_status = M.get_git_status(parent_ignored, status, absolute_path),
+    git_status = git_status,
     group_next = nil, -- If node is grouped, this points to the next child dir/link node
     has_children = has_children,
     link_to = link_to,
